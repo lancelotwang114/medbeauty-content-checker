@@ -1,0 +1,24 @@
+# Cloudflare Workers 設定檔
+# 若你使用 wrangler CLI 部署才會用到這個檔；
+# 若你用 Cloudflare Dashboard 網頁版部署（推薦）可以忽略這個檔。
+#
+# CLI 部署步驟（進階）：
+#   1. npm install -g wrangler
+#   2. wrangler login
+#   3. cd worker && wrangler deploy
+#   4. wrangler secret put ANTHROPIC_API_KEY
+#   5. wrangler secret put ACCESS_PASSWORD
+
+name = "medbeauty-audit-proxy"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# 一般變數（不敏感）
+[vars]
+DAILY_LIMIT = "50"
+ALLOWED_ORIGIN = "*"
+# 上線後請改為你的 GitHub Pages 網址，例如：
+# ALLOWED_ORIGIN = "https://your-name.github.io"
+
+# 敏感變數（API Key、密碼）請用 wrangler secret put 設定，
+# 不要寫在這個檔裡。

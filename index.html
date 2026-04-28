@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>醫美文章稽核工具</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root{
+    --bg:#f6f8fb; --panel:#ffffff; --line:#e3e8ef; --ink:#1f2937; --muted:#6b7280;
+    --primary:#2563eb; --primary-deep:#1d4ed8; --danger:#dc2626; --danger-bg:#fee2e2;
+    --warn:#d97706; --warn-bg:#fef3c7; --ok:#059669; --ok-bg:#d1fae5;
+    --accent:#8b5cf6;
+  }
+  html,body{height:100%;}
+  body{font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",system-ui,-apple-system,sans-serif;
+    background:var(--bg); color:var(--ink); font-size:14px; line-height:1.7;}
+  header{background:linear-gradient(135deg,#2563eb,#8b5cf6); color:#fff; padding:18px 24px;
+    display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,0.06);}
+  header h1{font-size:18px; font-weight:600; letter-spacing:0.5px;}
+  header .sub{font-size:12px; opacity:0.85; margin-top:2px;}
+  header .actions button{background:rgba(255,255,255,0.18); color:#fff; border:1px solid rgba(255,255,255,0.3);
+    padding:7px 14px; border-radius:6px; cursor:pointer; font-size:13px; margin-left:8px;}
+  header .actions button:hover{background:rgba(255,255,255,0.28);}
+
+  main{display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:16px; height:calc(100vh - 64px);}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; display:flex; flex-direction:column; overflow:hidden;}
+  .panel-head{padding:14px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;}
+  .panel-head h2{font-size:15px; font-weight:600;}
+  .panel-body{padding:14px 16px; overflow:auto; flex:1;}
+
+  .meta-row{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;}
+  input[type=text], input[type=password], select, textarea{
+    width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:6px; font-size:13px; font-family:inherit;
+    background:#fff; color:var(--ink);
+  }
+  input:focus, textarea:focus, select:focus{outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,0.15);}
+  textarea{resize:none;}
+  #article{flex:1; min-height:280px; line-height:1.8;}
+
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+  button.btn{padding:8px 14px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:13px; font-family:inherit;}
+  button.btn:hover{background:#f3f4f6;}
+  button.primary{background:var(--primary); color:#fff; border-color:var(--primary);}
+  button.primary:hover{background:var(--primary-deep);}
+  button.accent{background:var(--accent); color:#fff; border-color:var(--accent);}
+  button.accent:hover{filter:brightness(0.92);}
+  button:disabled{opacity:0.5; cursor:not-allowed;}
+
+  .stats{display:flex; gap:14px; margin-top:10px; font-size:12px; color:var(--muted); flex-wrap:wrap;}
+  .stats span b{color:var(--ink); font-weight:600;}
+
+  .tabs{display:flex; border-bottom:1px solid var(--line); padding:0 16px; gap:4px;}
+  .tab{padding:10px 14px; cursor:pointer; font-size:13px; border-bottom:2px solid transparent; color:var(--muted);}
+  .tab.active{color:var(--primary); border-color:var(--primary); font-weight:600;}
+  .tab .badge{display:inline-block; min-width:18px; padding:0 5px; margin-left:4px; background:var(--danger-bg); color:var(--danger);
+    border-radius:9px; font-size:11px; text-align:center; line-height:18px;}
+  .tab .badge.ok{background:var(--ok-bg); color:var(--ok);}
+  .tab .badge.warn{background:var(--warn-bg); color:var(--warn);}
+
+  .tab-pane{display:none;}
+  .tab-pane.active{display:block;}
+
+  .issue{padding:10px 12px; border:1px solid var(--line); border-left-width:4px; border-radius:6px; margin-bottom:8px; background:#fff;}
+  .issue.danger{border-left-color:var(--danger); background:#fef7f7;}
+  .issue.warn{border-left-color:var(--warn); background:#fffdf6;}
+  .issue.ok{border-left-color:var(--ok); background:#f5fdf9;}
+  .issue .title{font-weight:600; font-size:13px; margin-bottom:4px;}
+  .issue .desc{font-size:12.5px; color:var(--muted); line-height:1.65;}
+  .issue .quote{margin-top:6px; padding:6px 10px; background:#f9fafb; border-radius:4px; font-size:12.5px; color:#374151;}
+
+  .empty{text-align:center; color:var(--muted); padding:30px 10px; font-size:13px;}
+
+  /* highlight */
+  #highlight{white-space:pre-wrap; word-break:break-word; font-size:13.5px; line-height:1.85; padding:12px; background:#fafbfc; border:1px dashed var(--line); border-radius:6px;}
+  mark.banned{background:#fee2e2; color:#991b1b; border-radius:3px; padding:0 2px; font-weight:600;}
+  mark.warn{background:#fef3c7; color:#92400e; border-radius:3px; padding:0 2px;}
+
+  /* category chips */
+  .chips{display:flex; flex-wrap:wrap; gap:6px; margin:8px 0;}
+  .chip{padding:3px 9px; border-radius:12px; font-size:11.5px; background:#eef2ff; color:#3730a3;}
+  .chip.danger{background:var(--danger-bg); color:var(--danger);}
+
+  /* modal */
+  .mask{position:fixed; inset:0; background:rgba(15,23,42,0.5); display:none; align-items:center; justify-content:center; z-index:99;}
+  .mask.show{display:flex;}
+  .modal{background:#fff; border-radius:10px; width:min(720px, 92vw); max-height:88vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,0.25);}
+  .modal-head{padding:14px 18px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center;}
+  .modal-head h2{font-size:16px;}
+  .modal-body{padding:16px 18px; overflow:auto;}
+  .modal-foot{padding:12px 18px; border-top:1px solid var(--line); display:flex; justify-content:flex-end; gap:8px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12.5px; color:var(--muted); margin-bottom:4px; font-weight:600;}
+  .help{font-size:12px; color:var(--muted); margin-top:4px; line-height:1.6;}
+  /* Provider 模式切換：JS 會給 modal 加 class（mode-proxy / mode-direct） */
+  .mode-proxy .direct-only{display:none;}
+  .mode-direct .proxy-only{display:none;}
+
+  details summary{cursor:pointer; padding:8px 10px; background:#f3f4f6; border-radius:6px; font-size:13px; font-weight:600; user-select:none;}
+  details[open] summary{margin-bottom:8px;}
+
+  .ai-output{white-space:pre-wrap; font-size:13px; line-height:1.85; padding:12px 14px; background:#f8fafc; border:1px solid var(--line); border-radius:6px;}
+  .ai-output h3{font-size:14px; margin:10px 0 6px;}
+  .small{font-size:12px; color:var(--muted);}
+  .row{display:flex; gap:10px;}
+  .row > *{flex:1;}
+  .pill{display:inline-block; padding:2px 8px; border-radius:10px; font-size:11.5px; background:#eef2ff; color:#3730a3; margin-left:6px;}
+
+  .copy-btn{font-size:11.5px; padding:3px 8px;}
+
+  ::-webkit-scrollbar{width:8px; height:8px;}
+  ::-webkit-scrollbar-thumb{background:#cbd5e1; border-radius:4px;}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>醫美文章稽核工具</h1>
+    <div class="sub">禁字檢測 ・ 通順度規則 ・ AI 智慧審閱 ・ SEO 結構分析</div>
+  </div>
+  <div class="actions">
+    <button id="btnSettings">⚙ 設定</button>
+    <button id="btnHelp">？ 使用說明</button>
+  </div>
+</header>
+
+<main>
+  <!-- 左：輸入 -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>① 文章內容</h2>
+      <span class="small" id="lastSaved"></span>
+    </div>
+    <div class="panel-body" style="display:flex; flex-direction:column;">
+      <div class="meta-row">
+        <input id="title" type="text" placeholder="文章標題（選填，AI 會一併審閱）">
+        <input id="keyword" type="text" placeholder="主要關鍵字（選填，會計算密度）">
+      </div>
+      <textarea id="article" placeholder="請貼上文章內容..."></textarea>
+      <div class="toolbar">
+        <button class="btn primary" id="btnRuleCheck">🔎 規則檢查（即時）</button>
+        <button class="btn accent" id="btnAICheck">✨ AI 智慧檢測</button>
+        <button class="btn" id="btnClear">清空</button>
+        <button class="btn" id="btnSample">載入示範文章</button>
+      </div>
+      <div class="stats" id="stats">
+        <span>總字數：<b id="stCount">0</b></span>
+        <span>段落：<b id="stPara">0</b></span>
+        <span>句子：<b id="stSent">0</b></span>
+        <span>關鍵字密度：<b id="stKw">—</b></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 右：結果 -->
+  <section class="panel">
+    <div class="panel-head" style="padding-bottom:0;">
+      <h2>② 檢查結果</h2>
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="banned">禁字 <span class="badge ok" id="bgBanned">0</span></div>
+      <div class="tab" data-tab="fluency">通順度 <span class="badge ok" id="bgFluency">0</span></div>
+      <div class="tab" data-tab="seo">SEO 結構</div>
+      <div class="tab" data-tab="highlight">標記預覽</div>
+      <div class="tab" data-tab="ai">AI 建議</div>
+    </div>
+    <div class="panel-body">
+      <div class="tab-pane active" id="pane-banned">
+        <div class="empty">尚未檢查。請貼上文章後系統將自動分析。</div>
+      </div>
+      <div class="tab-pane" id="pane-fluency">
+        <div class="empty">尚未檢查。</div>
+      </div>
+      <div class="tab-pane" id="pane-seo">
+        <div class="empty">尚未檢查。</div>
+      </div>
+      <div class="tab-pane" id="pane-highlight">
+        <div class="empty">尚未檢查。</div>
+      </div>
+      <div class="tab-pane" id="pane-ai">
+        <div class="empty">點擊上方「✨ AI 智慧檢測」即可呼叫 AI 審閱（需先在「設定」中填入 API Key）。</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- 設定 modal -->
+<div class="mask" id="settingsMask">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>⚙ 設定</h2>
+      <button class="btn" data-close="settings">關閉</button>
+    </div>
+    <div class="modal-body">
+      <details open>
+        <summary>禁字清單管理</summary>
+        <div class="help">支援以「分類」管理禁字。每行一個詞；以 <code>== 分類名稱 ==</code> 起頭代表新增分類。已內建示範清單，等你提供完整清單後可整批貼上覆蓋，或匯入 JSON。</div>
+        <textarea id="bannedText" rows="14" style="font-family:Menlo,Consolas,monospace; font-size:12.5px; margin-top:8px;"></textarea>
+        <div class="toolbar">
+          <button class="btn" id="btnImportBanned">📥 匯入 JSON</button>
+          <button class="btn" id="btnExportBanned">📤 匯出 JSON</button>
+          <button class="btn" id="btnResetBanned">↻ 還原預設</button>
+          <input id="fileBanned" type="file" accept="application/json" style="display:none;">
+        </div>
+      </details>
+
+      <div style="height:10px;"></div>
+
+      <details>
+        <summary>AI 模型設定</summary>
+        <div class="field" style="margin-top:10px;">
+          <label>連線模式</label>
+          <select id="aiProvider">
+            <option value="proxy">Proxy 模式（推薦：透過 Cloudflare Worker，金鑰藏在後端）</option>
+            <option value="anthropic">直連 Anthropic Claude（需自填 API Key）</option>
+            <option value="openai">直連 OpenAI GPT（需自填 API Key）</option>
+          </select>
+        </div>
+
+        <!-- Proxy 模式欄位 -->
+        <div class="field proxy-only">
+          <label>Proxy URL（你的 Cloudflare Worker 網址）</label>
+          <input id="proxyUrl" type="text" placeholder="https://medbeauty-audit-proxy.your-name.workers.dev">
+          <div class="help">部署 Worker 後會拿到一段 <code>*.workers.dev</code> 網址，貼在這裡。</div>
+        </div>
+        <div class="field proxy-only">
+          <label>使用密碼（管理員提供）</label>
+          <input id="proxyPassword" type="password" placeholder="管理員設定的共用密碼">
+        </div>
+
+        <!-- 直連模式欄位 -->
+        <div class="field direct-only">
+          <label>API Key（僅儲存於瀏覽器本機，不會上傳）</label>
+          <input id="aiKey" type="password" placeholder="sk-...">
+        </div>
+
+        <div class="field">
+          <label>模型名稱</label>
+          <input id="aiModel" type="text" placeholder="claude-sonnet-4-5 或 gpt-4o-mini">
+          <div class="help">Anthropic 建議：<code>claude-sonnet-4-5</code>；OpenAI 建議：<code>gpt-4o-mini</code>（便宜）或 <code>gpt-4o</code>（較強）。</div>
+        </div>
+        <div class="field">
+          <label>稽核重點（系統提示詞，可自行調整）</label>
+          <textarea id="aiPrompt" rows="6" style="font-size:12.5px;"></textarea>
+        </div>
+        <div class="help" style="background:#eff6ff; border:1px solid #93c5fd; padding:8px 10px; border-radius:6px;">
+          <b>Proxy 模式說明：</b>API Key 由管理員設在 Cloudflare Worker 的環境變數，前端只會傳「使用密碼」與文章內容過去。Worker 會檢查密碼、做每日呼叫上限，再代為呼叫 Anthropic。最安全、可控、零金鑰外洩風險。
+        </div>
+        <div class="help" style="background:#fffbeb; border:1px solid #fcd34d; padding:8px 10px; border-radius:6px;">
+          <b>直連模式注意：</b>從瀏覽器直接打 API。Anthropic 會自動帶 dangerous-direct-browser-access header；OpenAI 預設可直接呼叫。Key 會存在這台電腦的 localStorage。
+        </div>
+        <div id="quotaInfo" class="help" style="margin-top:8px; display:none;"></div>
+      </details>
+    </div>
+    <div class="modal-foot">
+      <button class="btn primary" id="btnSaveSettings">💾 儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 說明 modal -->
+<div class="mask" id="helpMask">
+  <div class="modal">
+    <div class="modal-head"><h2>使用說明</h2><button class="btn" data-close="help">關閉</button></div>
+    <div class="modal-body">
+      <h3 style="font-size:14px; margin-bottom:6px;">工作流程</h3>
+      <ol style="padding-left:20px; line-height:2;">
+        <li>第一次使用先進入 <b>⚙ 設定</b>，填入 API Key 並依需求調整禁字清單。</li>
+        <li>把員工寫的文章貼到左側輸入框，<b>規則檢查會即時執行</b>（停止輸入 0.5 秒後）。</li>
+        <li>右側分頁可切換查看：禁字命中、通順度問題、SEO 結構、標記預覽（標紅版）、AI 建議。</li>
+        <li>確認需要 AI 二次審閱時點擊「✨ AI 智慧檢測」。</li>
+      </ol>
+      <h3 style="font-size:14px; margin:14px 0 6px;">分類嚴重度</h3>
+      <p>名稱含「絕對」「禁用」「不可」「重大」會被視為 <b style="color:var(--danger)">高嚴重度</b>（紅色），其餘為 <b style="color:var(--warn)">中嚴重度</b>（黃色）。</p>
+      <h3 style="font-size:14px; margin:14px 0 6px;">資料保存</h3>
+      <p>禁字清單、API Key、稽核提示詞都儲存在這台電腦的瀏覽器內（localStorage），不會上傳到任何伺服器。</p>
+      <h3 style="font-size:14px; margin:14px 0 6px;">部署建議</h3>
+      <p>單檔 HTML，可直接放在公司內網、Notion 附檔、Google Drive 共享，或用 GitHub Pages 部署成內部網址。</p>
+    </div>
+    <div class="modal-foot"><button class="btn primary" data-close="help">了解</button></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+ * 預設禁字清單（示範用，等正式清單到位後請整批替換）
+ * 來源整理自台灣常見醫美廣告法規敏感詞，僅供參考
+ * ========================================================= */
+const DEFAULT_BANNED = {
+  "絕對禁用 (誇大療效)": [
+    "療效","根治","絕對","100%","保證有效","永久","永久性","徹底根除","包治","完全治癒","痊癒"
+  ],
+  "誇大誇飾用語": [
+    "最有效","最佳","第一品牌","唯一","頂級","頂尖","神奇","奇蹟","完美","萬能","秒殺","逆天","媲美","超越","無人能敵"
+  ],
+  "醫療宣稱用語": [
+    "治療","醫治","治癒","康復","改善病症","抗癌","抗腫瘤","抗病毒","抑制癌","降血糖","降血壓","降血脂","治本"
+  ],
+  "副作用 / 安全宣稱": [
+    "無副作用","零風險","純天然成分","無任何副作用","無痛","完全安全","百分百安全"
+  ],
+  "未經核可的功效詞": [
+    "美白除斑","除疤","去皺","抗老化逆齡","回春","換膚再生","活化細胞","重建膠原","深層除皺"
+  ],
+  "不當比較與排序": [
+    "比醫美還有效","勝過開刀","贏過雷射","業界第一","全台第一","全球第一","業界唯一","獨家配方"
+  ]
+};
+const DEFAULT_PROMPT =
+`你是一位嚴謹的台灣醫美內容稽核編輯，熟悉《化粧品衛生安全管理法》《醫療法》《藥事法》《化粧品標示宣傳廣告涉及虛偽誇大或醫療效能認定基準》及衛福部廣告審查實務。
+請審閱使用者提供的文章，並依以下結構回覆（用繁體中文，分項清楚）：
+
+【一、違規風險】
+列出可能違反法規的具體用語或語意（包括明顯禁字、間接暗示療效、誇大、絕對化、引人錯誤的比較等）。每項標明：句子原文 → 風險類型 → 建議改寫。
+
+【二、通順度評分】
+給 1-10 分整體通順度，並列出文句不順、邏輯跳躍、贅字、重複囉嗦的位置（直接引用原句）。
+
+【三、SEO 與閱讀體驗建議】
+從標題吸引力、段落結構、關鍵字使用、CTA 行動呼籲、目標受眾語氣等面向給建議。
+
+【四、整體改寫建議】
+以條列方式列出 3-7 個最重要的修改方向，按優先順序排列。
+
+請嚴格、客觀，但也要建設性。`;
+
+/* =========================================================
+ * 工具函式
+ * ========================================================= */
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+const debounce = (fn, ms=400) => {
+  let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>fn(...a), ms); };
+};
+const escapeHTML = s => s.replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const escapeRE = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+function isHighSeverity(catName){
+  return /絕對|禁用|不可|重大|療效/.test(catName);
+}
+
+/* =========================================================
+ * 載入 / 儲存設定
+ * ========================================================= */
+const STORAGE_KEY = 'medAuditTool_v1';
+function loadStore(){
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch(e){ return {}; }
+}
+function saveStore(obj){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+}
+let store = Object.assign({
+  banned: DEFAULT_BANNED,
+  aiProvider: 'proxy',          // 'proxy' | 'anthropic' | 'openai'
+  aiKey: '',                     // 直連模式才用
+  aiModel: 'claude-sonnet-4-5',
+  aiPrompt: DEFAULT_PROMPT,
+  proxyUrl: '',                  // proxy 模式：你的 Cloudflare Worker 網址
+  proxyPassword: ''              // proxy 模式：共用密碼
+}, loadStore());
+
+/* =========================================================
+ * 禁字清單序列化（給設定 textarea 用）
+ * ========================================================= */
+function bannedToText(obj){
+  return Object.entries(obj).map(([cat, arr]) =>
+    `== ${cat} ==\n${arr.join('\n')}`
+  ).join('\n\n');
+}
+function textToBanned(txt){
+  const out = {};
+  let cur = '未分類';
+  txt.split(/\r?\n/).forEach(line => {
+    const trimmed = line.trim();
+    if(!trimmed) return;
+    const m = trimmed.match(/^==\s*(.+?)\s*==$/);
+    if(m){ cur = m[1]; if(!out[cur]) out[cur]=[]; return; }
+    if(!out[cur]) out[cur]=[];
+    if(!out[cur].includes(trimmed)) out[cur].push(trimmed);
+  });
+  return out;
+}
+
+/* =========================================================
+ * 統計
+ * ========================================================= */
+function computeStats(text, keyword){
+  const cleaned = text.replace(/\s+/g,'');
+  const count = [...cleaned].length;
+  const paragraphs = text.split(/\n\s*\n/).filter(p=>p.trim()).length || (text.trim()?1:0);
+  const sentences = text.split(/[。！？!?\n]+/).filter(s=>s.trim()).length;
+  let kwDensity = '—';
+  if(keyword && keyword.trim() && count>0){
+    const re = new RegExp(escapeRE(keyword.trim()), 'g');
+    const hits = (text.match(re)||[]).length;
+    kwDensity = hits>0 ? `${hits} 次（${(hits*keyword.trim().length/count*100).toFixed(2)}%）` : '0 次';
+  }
+  return { count, paragraphs, sentences, kwDensity };
+}
+
+/* =========================================================
+ * 禁字檢測
+ * ========================================================= */
+function detectBanned(text, banned){
+  const hits = []; // {word, category, severity, positions:[idx,...]}
+  for(const [cat, words] of Object.entries(banned)){
+    const sev = isHighSeverity(cat) ? 'danger' : 'warn';
+    for(const w of words){
+      if(!w) continue;
+      const re = new RegExp(escapeRE(w), 'g');
+      const positions = [];
+      let m;
+      while((m = re.exec(text)) !== null){
+        positions.push(m.index);
+        if(m.index === re.lastIndex) re.lastIndex++;
+      }
+      if(positions.length){
+        hits.push({ word:w, category:cat, severity:sev, count:positions.length, positions });
+      }
+    }
+  }
+  // 排序：高嚴重度在前，相同嚴重度依出現次數
+  hits.sort((a,b) => (a.severity===b.severity ? b.count-a.count : (a.severity==='danger'?-1:1)));
+  return hits;
+}
+
+/* =========================================================
+ * 通順度規則檢查
+ * ========================================================= */
+function detectFluency(text){
+  const issues = [];
+
+  // 1. 過長句子
+  const sentences = text.split(/(?<=[。！？!?])/);
+  let pos = 0;
+  sentences.forEach(s => {
+    const len = [...s.replace(/\s+/g,'')].length;
+    if(len > 80){
+      issues.push({
+        type:'長句', severity:'warn',
+        title:`句子過長（${len} 字）`,
+        desc:'閱讀體驗不佳，建議拆分為兩到三句，或加入逗號斷句。',
+        quote: s.trim().slice(0,80) + (s.length>80?'…':'')
+      });
+    }
+    pos += s.length;
+  });
+
+  // 2. 連續重複字（同一字連寫 3+ 次）
+  const repCharRE = /(.)\1{2,}/g;
+  let m;
+  while((m = repCharRE.exec(text)) !== null){
+    if(/\s/.test(m[1])) continue;
+    issues.push({
+      type:'連續重字', severity:'warn',
+      title:`「${m[1]}」連續出現 ${m[0].length} 次`,
+      desc:'可能是輸入錯誤或贅字。',
+      quote: text.slice(Math.max(0,m.index-15), m.index+m[0].length+15)
+    });
+  }
+
+  // 3. 重複用詞（同一詞在 30 字內出現 ≥3 次，2 字以上）
+  const wordCount = {};
+  // 簡化：以 2-4 字 ngram 取樣
+  const cleaned = text.replace(/\s+/g,'');
+  const seen = new Set();
+  for(let n=2;n<=3;n++){
+    const counts = {};
+    for(let i=0;i<=cleaned.length-n;i++){
+      const w = cleaned.slice(i, i+n);
+      if(/[，。！？、；：「」『』（）()【】\[\]\.\,]/.test(w)) continue;
+      counts[w] = (counts[w]||0)+1;
+    }
+    for(const [w,c] of Object.entries(counts)){
+      if(c>=4 && !seen.has(w) && w.length>=2){
+        seen.add(w);
+        issues.push({
+          type:'重複用詞', severity:'warn',
+          title:`「${w}」重複出現 ${c} 次`,
+          desc:'可考慮替換同義詞以提升豐富度。',
+          quote:''
+        });
+      }
+    }
+  }
+
+  // 4. 標點異常
+  if(/，{2,}|。{2,}|！{2,}|？{2,}/.test(text)){
+    issues.push({type:'標點', severity:'warn', title:'連續相同標點', desc:'發現連續逗號或句號，請檢查。', quote:''});
+  }
+  if(/[。。][^」』）)\s\n]*[a-zA-Z一-龥]/.test(text)){
+    // 句末沒換行也沒空格
+  }
+  // 半形/全形混用
+  if(/[一-龥][\,\.\?\!](?![a-zA-Z\d])/.test(text)){
+    issues.push({type:'標點', severity:'warn', title:'中文後使用半形標點', desc:'中文段落建議使用全形標點（，。？！）。', quote:''});
+  }
+
+  // 5. 中英夾雜未空格
+  if(/[一-龥][a-zA-Z]|[a-zA-Z][一-龥]/.test(text)){
+    issues.push({type:'格式', severity:'warn', title:'中英夾雜建議加空格', desc:'例如「使用Botox」建議改為「使用 Botox」以利閱讀。', quote:''});
+  }
+
+  // 6. 段落過長
+  const paras = text.split(/\n\s*\n/);
+  paras.forEach(p => {
+    const len = [...p.replace(/\s+/g,'')].length;
+    if(len > 300){
+      issues.push({
+        type:'段落', severity:'warn',
+        title:`段落過長（${len} 字）`,
+        desc:'單一段落超過 300 字會降低可讀性，建議拆段。',
+        quote:p.trim().slice(0,60)+'…'
+      });
+    }
+  });
+
+  return issues;
+}
+
+/* =========================================================
+ * SEO 結構
+ * ========================================================= */
+function detectSEO(title, keyword, text){
+  const items = [];
+  const charCount = [...text.replace(/\s+/g,'')].length;
+
+  // 標題
+  if(title){
+    const tlen = [...title.replace(/\s+/g,'')].length;
+    if(tlen<15) items.push({severity:'warn', title:`標題偏短（${tlen} 字）`, desc:'建議 25-32 字之間，較利於 SEO 與點擊率。'});
+    else if(tlen>40) items.push({severity:'warn', title:`標題偏長（${tlen} 字）`, desc:'搜尋結果可能被截斷，建議 25-32 字。'});
+    else items.push({severity:'ok', title:`標題長度適中（${tlen} 字）`, desc:'符合 SEO 最佳實踐。'});
+
+    if(keyword && !title.includes(keyword)){
+      items.push({severity:'warn', title:'標題未包含主關鍵字', desc:`未在標題出現「${keyword}」，建議自然地納入。`});
+    } else if(keyword){
+      items.push({severity:'ok', title:'標題包含主關鍵字', desc:'有助於主題相關性。'});
+    }
+  } else {
+    items.push({severity:'warn', title:'未填寫文章標題', desc:'建議填寫以便完整檢測。'});
+  }
+
+  // 字數
+  if(charCount<400) items.push({severity:'warn', title:`內文偏少（${charCount} 字）`, desc:'醫美主題建議至少 800 字以利搜尋表現。'});
+  else if(charCount>=400 && charCount<800) items.push({severity:'warn', title:`內文約 ${charCount} 字`, desc:'勉強達標，可再擴充。'});
+  else items.push({severity:'ok', title:`內文 ${charCount} 字`, desc:'字數充足。'});
+
+  // 關鍵字密度
+  if(keyword){
+    const re = new RegExp(escapeRE(keyword), 'g');
+    const hits = (text.match(re)||[]).length;
+    const density = charCount>0 ? hits*keyword.length/charCount*100 : 0;
+    if(hits===0) items.push({severity:'danger', title:'內文未出現主關鍵字', desc:'與標題無法呼應，請至少自然地提及 3-5 次。'});
+    else if(density<0.5) items.push({severity:'warn', title:`關鍵字密度偏低（${density.toFixed(2)}%）`, desc:'建議 1-3% 之間。'});
+    else if(density>4) items.push({severity:'warn', title:`關鍵字密度偏高（${density.toFixed(2)}%）`, desc:'可能被視為堆砌，建議降低。'});
+    else items.push({severity:'ok', title:`關鍵字密度 ${density.toFixed(2)}%`, desc:'落在合理範圍。'});
+  }
+
+  // 段落
+  const paras = text.split(/\n\s*\n/).filter(p=>p.trim());
+  if(paras.length<3) items.push({severity:'warn', title:`段落數偏少（${paras.length}）`, desc:'建議至少 5-8 段，以小標分節更佳。'});
+  else items.push({severity:'ok', title:`共 ${paras.length} 段`, desc:'段落分布合理。'});
+
+  // H 標題（用 # 或【】辨識）
+  const hLines = text.split('\n').filter(l => /^(#|【|■|◆|●|▶)/.test(l.trim()));
+  if(hLines.length===0) items.push({severity:'warn', title:'未偵測到次標題', desc:'建議用 H2/H3 結構（例如以 ## 或【】開頭的小標）切分主題段落。'});
+  else items.push({severity:'ok', title:`找到 ${hLines.length} 個小標`, desc:'結構清晰有助於 SEO 與閱讀。'});
+
+  // 行動呼籲
+  const ctaWords = ['預約','諮詢','立即','聯繫','了解更多','加 LINE','加line','官方 LINE'];
+  const hasCTA = ctaWords.some(w => text.includes(w));
+  if(!hasCTA) items.push({severity:'warn', title:'未發現行動呼籲（CTA）', desc:'建議在結尾加入「立即諮詢」「預約評估」等引導語句。'});
+  else items.push({severity:'ok', title:'已包含行動呼籲', desc:'有助於轉換。'});
+
+  return items;
+}
+
+/* =========================================================
+ * 標紅顯示
+ * ========================================================= */
+function buildHighlight(text, hits){
+  if(!text) return '<div class="empty">無內容</div>';
+  // 收集所有要標的位置
+  const marks = [];
+  hits.forEach(h => h.positions.forEach(p => marks.push({start:p, end:p+h.word.length, severity:h.severity, word:h.word})));
+  marks.sort((a,b)=> a.start-b.start || b.end-a.end);
+  // 去重疊（簡單作法：保留先出現的）
+  const filtered=[]; let lastEnd=0;
+  marks.forEach(m => { if(m.start>=lastEnd){ filtered.push(m); lastEnd=m.end; } });
+
+  let html=''; let i=0;
+  filtered.forEach(m => {
+    html += escapeHTML(text.slice(i, m.start));
+    html += `<mark class="${m.severity==='danger'?'banned':'warn'}" title="禁字：${escapeHTML(m.word)}">${escapeHTML(text.slice(m.start, m.end))}</mark>`;
+    i = m.end;
+  });
+  html += escapeHTML(text.slice(i));
+  return `<div id="highlight">${html || '<span class="empty">未發現禁字</span>'}</div>`;
+}
+
+/* =========================================================
+ * 渲染
+ * ========================================================= */
+function renderBanned(hits){
+  const pane = $('#pane-banned');
+  if(!hits.length){
+    pane.innerHTML = `<div class="issue ok"><div class="title">✓ 未發現禁字</div><div class="desc">未命中目前禁字清單。但這不代表內容完全合規，仍建議搭配 AI 智慧檢測查驗語意層面的暗示性宣稱。</div></div>`;
+    return;
+  }
+  let html = '';
+  // 分類聚合
+  const byCat = {};
+  hits.forEach(h => { if(!byCat[h.category]) byCat[h.category]=[]; byCat[h.category].push(h); });
+  for(const [cat, list] of Object.entries(byCat)){
+    const sev = isHighSeverity(cat)?'danger':'warn';
+    html += `<div class="issue ${sev}"><div class="title">${escapeHTML(cat)} <span class="pill">命中 ${list.length} 種</span></div>`;
+    html += `<div class="chips">`;
+    list.forEach(h => {
+      html += `<span class="chip ${sev==='danger'?'danger':''}">${escapeHTML(h.word)} ×${h.count}</span>`;
+    });
+    html += `</div></div>`;
+  }
+  pane.innerHTML = html;
+}
+function renderFluency(issues){
+  const pane = $('#pane-fluency');
+  if(!issues.length){
+    pane.innerHTML = `<div class="issue ok"><div class="title">✓ 未發現明顯通順度問題</div><div class="desc">通過所有規則檢查。建議再透過 AI 智慧檢測檢驗語感與邏輯性。</div></div>`;
+    return;
+  }
+  pane.innerHTML = issues.map(it =>
+    `<div class="issue ${it.severity}">
+      <div class="title">[${it.type}] ${escapeHTML(it.title)}</div>
+      <div class="desc">${escapeHTML(it.desc)}</div>
+      ${it.quote?`<div class="quote">…${escapeHTML(it.quote)}…</div>`:''}
+    </div>`
+  ).join('');
+}
+function renderSEO(items){
+  const pane = $('#pane-seo');
+  if(!items.length){ pane.innerHTML = `<div class="empty">無資料</div>`; return; }
+  pane.innerHTML = items.map(it =>
+    `<div class="issue ${it.severity}">
+      <div class="title">${escapeHTML(it.title)}</div>
+      <div class="desc">${escapeHTML(it.desc)}</div>
+    </div>`
+  ).join('');
+}
+function renderHighlight(text, hits){
+  $('#pane-highlight').innerHTML = buildHighlight(text, hits);
+}
+
+function updateBadges(bannedCount, fluencyCount){
+  const a = $('#bgBanned'), b = $('#bgFluency');
+  a.textContent = bannedCount;
+  a.className = 'badge ' + (bannedCount===0?'ok':'');
+  b.textContent = fluencyCount;
+  b.className = 'badge ' + (fluencyCount===0?'ok':'warn');
+}
+
+/* =========================================================
+ * AI 呼叫
+ * ========================================================= */
+async function callAI(systemPrompt, userMessage){
+  const provider = store.aiProvider, apiKey = store.aiKey, model = store.aiModel;
+
+  // Proxy 模式：透過 Cloudflare Worker 中介，金鑰藏在後端
+  if(provider === 'proxy'){
+    if(!store.proxyUrl) throw new Error('尚未設定 Proxy URL，請先到「⚙ 設定」填入 Cloudflare Worker 網址。');
+    if(!store.proxyPassword) throw new Error('尚未設定使用密碼，請先到「⚙ 設定」填入管理員提供的密碼。');
+    const resp = await fetch(store.proxyUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        password: store.proxyPassword,
+        model: model || 'claude-sonnet-4-5',
+        max_tokens: 2500,
+        system: systemPrompt,
+        user: userMessage
+      })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if(!resp.ok){
+      const msg = data.error || `Proxy 錯誤 ${resp.status}`;
+      const quotaMsg = data.quota ? `（今日已用 ${data.quota.used}/${data.quota.limit}）` : '';
+      throw new Error(msg + quotaMsg);
+    }
+    if(data.quota){
+      updateQuotaInfo(data.quota);
+    }
+    return data.text || '（無內容）';
+  }
+
+  if(!apiKey) throw new Error('尚未設定 API Key，請先到「⚙ 設定」填入。');
+
+  if(provider === 'anthropic'){
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{
+        'content-type':'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: model || 'claude-sonnet-4-5',
+        max_tokens: 2500,
+        system: systemPrompt,
+        messages: [{role:'user', content: userMessage}]
+      })
+    });
+    if(!resp.ok){
+      const err = await resp.text();
+      throw new Error(`Anthropic API 錯誤 ${resp.status}：${err}`);
+    }
+    const data = await resp.json();
+    return data.content?.[0]?.text || '（無內容）';
+  } else {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method:'POST',
+      headers:{
+        'content-type':'application/json',
+        'authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model || 'gpt-4o-mini',
+        messages: [
+          {role:'system', content: systemPrompt},
+          {role:'user', content: userMessage}
+        ]
+      })
+    });
+    if(!resp.ok){
+      const err = await resp.text();
+      throw new Error(`OpenAI API 錯誤 ${resp.status}：${err}`);
+    }
+    const data = await resp.json();
+    return data.choices?.[0]?.message?.content || '（無內容）';
+  }
+}
+
+async function runAICheck(){
+  const text = $('#article').value.trim();
+  if(!text){ alert('請先輸入文章內容。'); return; }
+  const title = $('#title').value.trim();
+  const keyword = $('#keyword').value.trim();
+  const userMsg =
+`【文章標題】${title || '（未提供）'}
+【主要關鍵字】${keyword || '（未提供）'}
+【文章內容】
+${text}`;
+  switchTab('ai');
+  $('#pane-ai').innerHTML = `<div class="empty">⏳ AI 審閱中，請稍候（通常 10-30 秒）...</div>`;
+  try{
+    const result = await callAI(store.aiPrompt, userMsg);
+    $('#pane-ai').innerHTML = `<button class="btn copy-btn" onclick="copyAI()">📋 複製結果</button><div class="ai-output" id="aiOutput">${escapeHTML(result)}</div>`;
+  } catch(e){
+    $('#pane-ai').innerHTML = `<div class="issue danger"><div class="title">AI 檢測失敗</div><div class="desc">${escapeHTML(e.message)}</div></div>`;
+  }
+}
+window.copyAI = ()=>{
+  const t = $('#aiOutput').innerText;
+  navigator.clipboard.writeText(t).then(()=>alert('已複製到剪貼簿'));
+};
+
+/* =========================================================
+ * 主流程：規則檢查
+ * ========================================================= */
+function runRuleCheck(){
+  const text = $('#article').value;
+  const title = $('#title').value;
+  const keyword = $('#keyword').value;
+
+  // 統計
+  const s = computeStats(text, keyword);
+  $('#stCount').textContent = s.count;
+  $('#stPara').textContent = s.paragraphs;
+  $('#stSent').textContent = s.sentences;
+  $('#stKw').textContent = s.kwDensity;
+
+  if(!text.trim()){
+    $('#pane-banned').innerHTML = `<div class="empty">尚未輸入文章。</div>`;
+    $('#pane-fluency').innerHTML = `<div class="empty">尚未輸入文章。</div>`;
+    $('#pane-seo').innerHTML = `<div class="empty">尚未輸入文章。</div>`;
+    $('#pane-highlight').innerHTML = `<div class="empty">尚未輸入文章。</div>`;
+    updateBadges(0,0);
+    return;
+  }
+
+  const bannedHits = detectBanned(text, store.banned);
+  const fluencyIssues = detectFluency(text);
+  const seoItems = detectSEO(title, keyword, text);
+
+  renderBanned(bannedHits);
+  renderFluency(fluencyIssues);
+  renderSEO(seoItems);
+  renderHighlight(text, bannedHits);
+
+  const bannedTotal = bannedHits.reduce((a,b)=>a+b.count,0);
+  updateBadges(bannedTotal, fluencyIssues.length);
+}
+
+/* =========================================================
+ * Tab 切換
+ * ========================================================= */
+function switchTab(name){
+  $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab===name));
+  $$('.tab-pane').forEach(p => p.classList.toggle('active', p.id===`pane-${name}`));
+}
+
+/* =========================================================
+ * 設定 modal 邏輯
+ * ========================================================= */
+function openSettings(){
+  $('#bannedText').value = bannedToText(store.banned);
+  $('#aiProvider').value = store.aiProvider;
+  $('#aiKey').value = store.aiKey;
+  $('#aiModel').value = store.aiModel;
+  $('#aiPrompt').value = store.aiPrompt;
+  $('#proxyUrl').value = store.proxyUrl || '';
+  $('#proxyPassword').value = store.proxyPassword || '';
+  applyProviderMode(store.aiProvider);
+  $('#settingsMask').classList.add('show');
+  // 若是 proxy 模式且已設定 URL，順便查一下今日剩餘額度
+  if(store.aiProvider === 'proxy' && store.proxyUrl){
+    fetchQuota();
+  }
+}
+function closeSettings(){ $('#settingsMask').classList.remove('show'); }
+function applyProviderMode(provider){
+  const modal = $('#settingsMask .modal');
+  if(!modal) return;
+  modal.classList.toggle('mode-proxy',  provider === 'proxy');
+  modal.classList.toggle('mode-direct', provider !== 'proxy');
+}
+function saveSettings(){
+  store.banned = textToBanned($('#bannedText').value);
+  store.aiProvider = $('#aiProvider').value;
+  store.aiKey = $('#aiKey').value.trim();
+  const defaultModel = store.aiProvider === 'openai' ? 'gpt-4o-mini' : 'claude-sonnet-4-5';
+  store.aiModel = $('#aiModel').value.trim() || defaultModel;
+  store.aiPrompt = $('#aiPrompt').value;
+  store.proxyUrl = $('#proxyUrl').value.trim().replace(/\/$/, '');
+  store.proxyPassword = $('#proxyPassword').value;
+  saveStore(store);
+  closeSettings();
+  runRuleCheck();
+}
+
+/* 查詢今日已用配額（GET /worker → { quota: { used, limit, remaining } }） */
+async function fetchQuota(){
+  if(!store.proxyUrl) return;
+  try{
+    const r = await fetch(store.proxyUrl, { method:'GET' });
+    const data = await r.json();
+    if(data.quota) updateQuotaInfo(data.quota);
+  } catch(e){ /* 靜默失敗 */ }
+}
+function updateQuotaInfo(quota){
+  const el = $('#quotaInfo');
+  if(!el) return;
+  el.style.display = 'block';
+  el.style.background = quota.remaining > 5 ? '#ecfdf5' : '#fef2f2';
+  el.style.border = '1px solid ' + (quota.remaining > 5 ? '#6ee7b7' : '#fca5a5');
+  el.style.padding = '8px 10px';
+  el.style.borderRadius = '6px';
+  el.innerHTML = `<b>📊 今日 AI 用量：</b>已使用 ${quota.used} / ${quota.limit} 次，剩餘 <b>${quota.remaining}</b> 次。`;
+}
+
+/* =========================================================
+ * 事件綁定
+ * ========================================================= */
+$('#btnSettings').addEventListener('click', openSettings);
+$('#btnHelp').addEventListener('click', ()=> $('#helpMask').classList.add('show'));
+$$('button[data-close]').forEach(b => b.addEventListener('click', e => {
+  document.querySelector(`#${e.target.dataset.close}Mask`).classList.remove('show');
+}));
+$('#btnSaveSettings').addEventListener('click', saveSettings);
+$('#aiProvider').addEventListener('change', e => applyProviderMode(e.target.value));
+$('#btnRuleCheck').addEventListener('click', runRuleCheck);
+$('#btnAICheck').addEventListener('click', runAICheck);
+$('#btnClear').addEventListener('click', ()=>{
+  if(confirm('確定要清空文章內容？')){
+    $('#article').value=''; $('#title').value=''; $('#keyword').value='';
+    runRuleCheck();
+  }
+});
+$('#btnSample').addEventListener('click', ()=>{
+  $('#title').value = '【2026 春季限定】最有效的玻尿酸隆鼻，根治塌鼻問題';
+  $('#keyword').value = '玻尿酸隆鼻';
+  $('#article').value = `想擁有完美的立體鼻型嗎？我們的玻尿酸隆鼻療程，保證 100% 改善您的塌鼻問題，療效永久持續，是業界第一品牌的選擇。
+
+純天然成分，無任何副作用，比開刀還要安全。我們的醫師擁有頂尖的技術，能徹底根治您的鼻型困擾，讓您一次見證奇蹟般的效果。
+
+療程過程完全無痛，零風險，是台灣最有效的醫美方案。立即預約，享受神奇的回春效果，重拾自信美麗。
+
+我們使用獨家配方，能完全治癒鼻部不對稱問題，效果勝過傳統手術，是醫美界的唯一選擇。`;
+  runRuleCheck();
+  switchTab('banned');
+});
+$$('.tab').forEach(t => t.addEventListener('click', ()=> switchTab(t.dataset.tab)));
+
+// 即時檢查
+const debouncedCheck = debounce(runRuleCheck, 500);
+$('#article').addEventListener('input', debouncedCheck);
+$('#title').addEventListener('input', debouncedCheck);
+$('#keyword').addEventListener('input', debouncedCheck);
+
+// 禁字清單匯入匯出
+$('#btnExportBanned').addEventListener('click', ()=>{
+  const data = JSON.stringify(textToBanned($('#bannedText').value), null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `banned-words-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+});
+$('#btnImportBanned').addEventListener('click', ()=> $('#fileBanned').click());
+$('#fileBanned').addEventListener('change', e => {
+  const f = e.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const obj = JSON.parse(ev.target.result);
+      $('#bannedText').value = bannedToText(obj);
+      alert('匯入成功，記得點儲存。');
+    } catch(err){ alert('JSON 格式錯誤：'+err.message); }
+  };
+  reader.readAsText(f);
+});
+$('#btnResetBanned').addEventListener('click', ()=>{
+  if(confirm('還原為內建預設清單？')){
+    $('#bannedText').value = bannedToText(DEFAULT_BANNED);
+  }
+});
+
+// 初次載入跑一次
+runRuleCheck();
+</script>
+</body>
+</html>
